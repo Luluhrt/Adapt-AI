@@ -24,24 +24,21 @@ A FastAPI application for visualizing French cadastral data (Parcellaire Express
 
 ### 1. Clone or download the project
 
-```bash
-cd C:\Users\lucie\Documents\Boulot\Stage\Adapt_AI
-```
 
 ### 2. Create and activate virtual environment
 
 ```powershell
 # Create virtual environment
-python -m venv virt
+python -m venv virtenv
 
 # Activate (Windows PowerShell)
-.\virt\Scripts\Activate.ps1
+.\virtenv\Scripts\Activate.ps1
 
 # Activate (Windows CMD)
-.\virt\Scripts\activate.bat
+.\virtenv\Scripts\activate.bat
 
 # Activate (Linux/Mac)
-source virt/bin/activate
+source virtenv/bin/activate
 ```
 
 ### 3. Install dependencies
@@ -241,3 +238,4 @@ This project uses open data from IGN (Institut National de l'Information Géogra
 ## Author
 
 Developed as part of an internship project.
+
