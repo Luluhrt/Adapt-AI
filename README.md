@@ -24,6 +24,8 @@ A FastAPI application for visualizing French cadastral data (Parcellaire Express
 
 ### 1. Clone or download the project
 
+Download the database backup via this link : https://drive.google.com/file/d/1UbfpTQonRpzTpsxPgYM3zM844LoaK9HC/view?usp=sharing 
+
 
 ### 2. Create and activate virtual environment
 
@@ -238,4 +240,5 @@ This project uses open data from IGN (Institut National de l'Information Géogra
 ## Author
 
 Developed as part of an internship project.
+
 
