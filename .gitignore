@@ -1,0 +1,54 @@
+# =============================================================================
+# Python
+# =============================================================================
+
+# Virtual environment
+virt/
+venv/
+.venv/
+env/
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# =============================================================================
+# IDE
+# =============================================================================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# =============================================================================
+# Project specific
+# =============================================================================
+
+# Large source data files (keep backup.sql, ignore raw shapefiles)
+PARCELLAIRE-EXPRESS_1-1__SHP_LAMB93_D002_2025-12-01/
+PARCELLAIRE-EXPRESS_1-1__SHP_LAMB93_D002_2025-12-01.7z
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# API tokens and secrets (don't commit these!)
+# Uncomment if you add real tokens to config.py:
+# config.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
