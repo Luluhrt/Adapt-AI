@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carte Cadastrale - Parcelles</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <!-- Leaflet JS -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <style>
+      /* =========================================================================
+       BASE STYLES
+       ========================================================================= */
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+
+      /* =========================================================================
+       STATUS BAR (top-left)
+       ========================================================================= */
+
+      .status-bar {
+        position: absolute;
+        top: 10px;
+        left: 50px;
+        z-index: 1000;
+        background: white;
+        padding: 8px 14px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 14px;
+        max-width: 300px;
+      }
+
+      .status-bar.error {
+        background: #fee;
+        color: #c00;
+      }
+
+      /* =========================================================================
+       CONTROL PANEL (top-right)
+       ========================================================================= */
+
+      .control-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 14px 18px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .control-panel label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .control-panel input[type="number"] {
+        width: 80px;
+        padding: 6px 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .control-panel button {
+        padding: 8px 14px;
+        background: #0066cc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+
+      .control-panel button:hover {
+        background: #0055aa;
+      }
+
+      /* =========================================================================
+       PARCELLE POPUP
+       ========================================================================= */
+
+      .parcelle-popup {
+        min-width: 220px;
+      }
+
+      .parcelle-popup h4 {
+        margin: 0 0 10px 0;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #0066cc;
+        color: #333;
+        font-size: 15px;
+      }
+
+      .parcelle-popup table {
+        width: 100%;
+        font-size: 12px;
+        border-collapse: collapse;
+      }
+
+      .parcelle-popup td {
+        padding: 3px 6px;
+      }
+
+      .parcelle-popup td:first-child {
+        font-weight: 600;
+        color: #666;
+        width: 80px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Map container -->
+    <div id="map"></div>
+
+    <!-- Status bar (loading indicator) -->
+    <div id="status" class="status-bar">Initialisation...</div>
+
+    <!-- Control panel -->
+    <div class="control-panel">
+      <label>
+        Limite :
+        <input
+          type="number"
+          id="limitInput"
+          value="2000"
+          min="1"
+          max="10000"
+          step="100"
+          title="Nombre maximum de parcelles à charger"
+        />
+      </label>
+      <button id="reloadBtn" title="Recharger les parcelles">Recharger</button>
+    </div>
+
+    <script>
+      // =========================================================================
+      // CONFIGURATION
+      // =========================================================================
+
+      const CONFIG = {
+        // Default map center (Aisne department)
+        center: [49.9, 3.6],
+        zoom: 12,
+
+        // Default parcelle limit
+        defaultLimit: 2000,
+
+        // Parcelle style
+        parcelleStyle: {
+          color: "#0066cc",
+          weight: 2,
+          fillOpacity: 0.15,
+        },
+
+        // Debounce delay for map movements (ms)
+        debounceDelay: 300,
+      };
+
+      // =========================================================================
+      // MAP INITIALIZATION
+      // =========================================================================
+
+      // OpenStreetMap tile layer
+      const osmLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }
+      );
+
+      // Initialize map with Canvas renderer for better performance
+      const map = L.map("map", {
+        layers: [osmLayer],
+        preferCanvas: true, // Use Canvas instead of SVG for better performance
+      }).setView(CONFIG.center, CONFIG.zoom);
+
+      // =========================================================================
+      // STATE VARIABLES
+      // =========================================================================
+
+      const statusEl = document.getElementById("status");
+      const limitInput = document.getElementById("limitInput");
+      const reloadBtn = document.getElementById("reloadBtn");
+
+      let parcelleLayer = null; // Current parcelle layer
+      let loadTimeout = null; // Debounce timeout
+
+      // =========================================================================
+      // UTILITY FUNCTIONS
+      // =========================================================================
+
+      /**
+       * Get simplification tolerance based on zoom level.
+       *
+       * Higher tolerance = simpler geometry = faster rendering
+       * Lower tolerance = more detail = slower rendering
+       *
+       * @param {number} zoom - Current map zoom level
+       * @returns {number} Tolerance in meters
+       */
+      function getSimplifyTolerance(zoom) {
+        if (zoom >= 17) return 0; // Full detail (zoomed in)
+        if (zoom >= 15) return 2; // Slight simplification
+        if (zoom >= 13) return 5; // Moderate
+        if (zoom >= 11) return 15; // Aggressive
+        return 30; // Very simplified (zoomed out)
+      }
+
+      /**
+       * Get current limit value from input.
+       * @returns {number} Limit value
+       */
+      function getLimit() {
+        const val = parseInt(limitInput.value, 10);
+        return isNaN(val) || val < 1 ? CONFIG.defaultLimit : val;
+      }
+
+      /**
+       * Format surface from centiares to hectares.
+       * @param {number} centiares - Surface in centiares (1/100 m²)
+       * @returns {string} Formatted surface string
+       */
+      function formatSurface(centiares) {
+        if (!centiares) return "N/A";
+        const hectares = centiares / 10000;
+        return hectares.toFixed(2) + " ha";
+      }
+
+      /**
+       * Update status bar with message and optional error state.
+       * @param {string} message - Message to display
+       * @param {boolean} isError - Whether this is an error message
+       */
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle("error", isError);
+      }
+
+      // =========================================================================
+      // PARCELLE LOADING
+      // =========================================================================
+
+      /**
+       * Load parcelles for the current map view.
+       *
+       * Fetches parcelles within the visible bounding box from the API
+       * and displays them on the map.
+       */
+      async function loadParcelles() {
+        const bounds = map.getBounds();
+        const zoom = map.getZoom();
+        const limit = getLimit();
+
+        // Build query parameters
+        const params = new URLSearchParams({
+          xmin: bounds.getWest(),
+          ymin: bounds.getSouth(),
+          xmax: bounds.getEast(),
+          ymax: bounds.getNorth(),
+          limit: limit,
+          simplify: getSimplifyTolerance(zoom),
+        });
+
+        setStatus("Chargement des parcelles...");
+
+        try {
+          // Fetch parcelles from API
+          const response = await fetch(`/parcelle/?${params}`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          // Remove previous layer
+          if (parcelleLayer) {
+            map.removeLayer(parcelleLayer);
+          }
+
+          // Handle empty results
+          if (!data.features || data.features.length === 0) {
+            setStatus("Aucune parcelle dans cette zone.");
+            return;
+          }
+
+          // Create GeoJSON layer
+          parcelleLayer = L.geoJSON(data, {
+            style: CONFIG.parcelleStyle,
+            onEachFeature: onEachParcelle,
+          });
+
+          parcelleLayer.addTo(map);
+
+          // Update status
+          const limitHit = data.features.length >= limit;
+          const message =
+            data.features.length +
+            " parcelle(s)" +
+            (limitHit ? " (limite atteinte, zoomez)" : "");
+          setStatus(message);
+        } catch (error) {
+          console.error("Error loading parcelles:", error);
+          setStatus("Erreur: " + error.message, true);
+        }
+      }
+
+      /**
+       * Configure each parcelle feature with popup.
+       * @param {Object} feature - GeoJSON feature
+       * @param {L.Layer} layer - Leaflet layer
+       */
+      function onEachParcelle(feature, layer) {
+        const props = feature.properties || {};
+        const popupContent = createPopupContent(feature.id, props);
+        layer.bindPopup(popupContent, { maxWidth: 320 });
+      }
+
+      // =========================================================================
+      // POPUP CREATION
+      // =========================================================================
+
+      /**
+       * Create popup content for a parcelle.
+       * @param {number} id - Parcelle ID
+       * @param {Object} props - Parcelle properties
+       * @returns {HTMLElement} Popup container element
+       */
+      function createPopupContent(id, props) {
+        const container = document.createElement("div");
+        container.className = "parcelle-popup";
+
+        // Build parcelle title
+        const title = `Parcelle ${props.section || ""}${props.numero || ""}`;
+
+        // Build info table
+        container.innerHTML = `
+        <h4>${title}</h4>
+        <table>
+          <tr><td>ID</td><td>${id}</td></tr>
+          <tr><td>IDU</td><td>${props.idu || "N/A"}</td></tr>
+          <tr><td>Commune</td><td>${props.nom_com || "N/A"}</td></tr>
+          <tr><td>Département</td><td>${props.code_dep || "N/A"}</td></tr>
+          <tr><td>Section</td><td>${props.section || "N/A"}</td></tr>
+          <tr><td>Numéro</td><td>${props.numero || "N/A"}</td></tr>
+          <tr><td>Feuille</td><td>${props.feuille || "N/A"}</td></tr>
+          <tr><td>Surface</td><td>${formatSurface(props.contenance)}</td></tr>
+        </table>
+      `;
+
+        return container;
+      }
+
+      // =========================================================================
+      // EVENT HANDLERS
+      // =========================================================================
+
+      /**
+       * Handle map movement (pan/zoom).
+       * Debounced to prevent excessive API calls.
+       */
+      function onMapMove() {
+        clearTimeout(loadTimeout);
+        loadTimeout = setTimeout(loadParcelles, CONFIG.debounceDelay);
+      }
+
+      // Map events
+      map.on("moveend", onMapMove);
+
+      // Control panel events
+      reloadBtn.addEventListener("click", loadParcelles);
+      limitInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") loadParcelles();
+      });
+
+      // =========================================================================
+      // INITIALIZATION
+      // =========================================================================
+
+      // Load parcelles on page load
+      loadParcelles();
+    </script>
+  </body>
+</html>
