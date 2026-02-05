@@ -24,7 +24,7 @@ A FastAPI application for visualizing French cadastral data (Parcellaire Express
 
 ### 1. Clone or download the project
 
-Download the database backup via this link : https://drive.google.com/file/d/1UbfpTQonRpzTpsxPgYM3zM844LoaK9HC/view?usp=sharing 
+Download the database backup via this [Google Drive link](https://drive.google.com/file/d/1UbfpTQonRpzTpsxPgYM3zM844LoaK9HC/view?usp=sharing)
 
 
 ### 2. Create and activate virtual environment
@@ -46,7 +46,7 @@ source virtenv/bin/activate
 ### 3. Install dependencies
 
 ```bash
-pip install fastapi uvicorn sqlalchemy psycopg2-binary geoalchemy2
+pip install -r requirements.txt
 ```
 
 ### 4. Set up PostgreSQL with PostGIS
@@ -79,7 +79,7 @@ Or in pgAdmin:
 
 #### Option B: Import from shapefiles
 
-Download Parcellaire Express data from [IGN Geoservices](https://geoservices.ign.fr/parcellaire-express).
+Download Parcellaire Express data from [IGN Geoservices](https://geoservices.ign.fr/parcellaire-express-pci).
 
 Import shapefiles using `shp2pgsql` or `ogr2ogr`:
 
@@ -240,5 +240,6 @@ This project uses open data from IGN (Institut National de l'Information Géogra
 ## Author
 
 Developed as part of an internship project.
+
 
 
